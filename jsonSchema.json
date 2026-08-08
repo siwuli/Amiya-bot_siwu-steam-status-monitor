@@ -1,0 +1,175 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Steam 状态监控插件全局配置",
+  "description": "监控群内 Steam 玩家在线状态与游戏动态：开始/结束游戏、成就解锁、网络波动自动推送，游戏时长排行榜与每日榜单推送。",
+  "properties": {
+    "steam_api_key": {
+      "type": "string",
+      "title": "Steam Web API Key",
+      "description": "Steam Web API Key（必填）。获取地址：https://steamcommunity.com/dev/apikey",
+      "default": ""
+    },
+    "sgdb_api_key": {
+      "type": "string",
+      "title": "SteamGridDB API Key",
+      "description": "SteamGridDB API Key（可选，用于获取游戏封面图）。获取地址：https://www.steamgriddb.com/profile/preferences/api",
+      "default": ""
+    },
+    "steam_api_base": {
+      "type": "string",
+      "title": "Steam Web API 地址",
+      "description": "Steam Web API 基础地址，留空使用官方 https://api.steampowered.com",
+      "default": ""
+    },
+    "steam_store_base": {
+      "type": "string",
+      "title": "Steam 商店地址",
+      "description": "Steam 商店基础地址，留空使用官方 https://store.steampowered.com",
+      "default": ""
+    },
+    "sgdb_api_base": {
+      "type": "string",
+      "title": "SteamGridDB 地址",
+      "description": "SteamGridDB 基础地址，留空使用官方 https://www.steamgriddb.com",
+      "default": ""
+    },
+    "retry_times": {
+      "type": "integer",
+      "title": "API 请求重试次数",
+      "description": "API 请求失败重试次数",
+      "default": 3,
+      "minimum": 0,
+      "maximum": 10
+    },
+    "enable_proxy": {
+      "type": "boolean",
+      "title": "启用代理",
+      "description": "是否启用 HTTP 代理访问 Steam / SteamGridDB 接口",
+      "default": false
+    },
+    "proxy_url": {
+      "type": "string",
+      "title": "代理地址",
+      "description": "HTTP 代理地址，例如 http://127.0.0.1:7890（SOCKS 代理不受支持）",
+      "default": ""
+    },
+    "fixed_poll_interval": {
+      "type": "integer",
+      "title": "固定轮询间隔（秒）",
+      "description": "固定轮询间隔（秒），0 表示使用智能轮询",
+      "default": 0,
+      "minimum": 0
+    },
+    "smart_poll_intervals": {
+      "type": "array",
+      "title": "智能轮询间隔（分钟）",
+      "description": "智能轮询间隔（分钟），依次对应：游戏中 / 12分钟内 / 12分钟~3小时 / 3小时~24小时 / 24~48小时 / 超过48小时",
+      "items": { "type": "integer", "minimum": 1 },
+      "minItems": 6,
+      "maxItems": 6,
+      "default": [1, 3, 5, 10, 20, 30]
+    },
+    "detailed_poll_log": {
+      "type": "boolean",
+      "title": "详细轮询日志",
+      "description": "是否输出详细轮询日志",
+      "default": true
+    },
+    "max_group_size": {
+      "type": "integer",
+      "title": "每群最大监控数",
+      "description": "每个群最大监控 SteamID 数量",
+      "default": 20,
+      "minimum": 1,
+      "maximum": 100
+    },
+    "cache_avatar_hours": {
+      "type": "integer",
+      "title": "头像缓存（小时）",
+      "description": "头像缓存时长（小时）",
+      "default": 24,
+      "minimum": 0
+    },
+    "cache_avatar_frame_hours": {
+      "type": "integer",
+      "title": "头像框缓存（小时）",
+      "description": "头像框缓存时长（小时）",
+      "default": 720,
+      "minimum": 0
+    },
+    "cache_cover_vertical_hours": {
+      "type": "integer",
+      "title": "竖版封面缓存（小时）",
+      "description": "竖版游戏封面缓存时长（小时），0 表示不缓存",
+      "default": 0,
+      "minimum": 0
+    },
+    "rank_push_hour": {
+      "type": "integer",
+      "title": "每日榜单推送时",
+      "description": "每日排行榜推送时间（时，24 小时制）",
+      "default": 8,
+      "minimum": 0,
+      "maximum": 23
+    },
+    "rank_push_minute": {
+      "type": "integer",
+      "title": "每日榜单推送分",
+      "description": "每日排行榜推送时间（分）",
+      "default": 30,
+      "minimum": 0,
+      "maximum": 59
+    },
+    "notify_send_text": {
+      "type": "boolean",
+      "title": "通知附带文本",
+      "description": "开始/结束游戏通知是否附带文本内容",
+      "default": true
+    },
+    "notify_send_image": {
+      "type": "boolean",
+      "title": "通知附带图片",
+      "description": "开始/结束游戏通知是否附带图片卡片",
+      "default": true
+    },
+    "enable_network_fluctuation_notify": {
+      "type": "boolean",
+      "title": "网络波动通知",
+      "description": "是否推送网络波动（API 暂时异常）通知",
+      "default": true
+    },
+    "enable_game_start_notify": {
+      "type": "boolean",
+      "title": "开始游戏通知",
+      "description": "是否推送开始游戏通知",
+      "default": true
+    },
+    "enable_game_end_notify": {
+      "type": "boolean",
+      "title": "结束游戏通知",
+      "description": "是否推送结束游戏通知",
+      "default": true
+    },
+    "enable_achievement_poll": {
+      "type": "boolean",
+      "title": "成就监控轮询",
+      "description": "是否启用成就解锁监控轮询",
+      "default": true
+    },
+    "game_filter_mode": {
+      "type": "string",
+      "title": "游戏过滤模式",
+      "description": "游戏过滤模式：全部游戏 / 白名单 / 黑名单",
+      "enum": ["全部游戏", "白名单", "黑名单"],
+      "default": "全部游戏"
+    },
+    "game_filter_ids": {
+      "type": "string",
+      "title": "游戏过滤 ID",
+      "description": "游戏 ID 列表，逗号分隔（如 730,570,440）",
+      "default": ""
+    }
+  },
+  "required": []
+}

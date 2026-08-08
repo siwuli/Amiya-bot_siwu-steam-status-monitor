@@ -1,0 +1,134 @@
+# -*- coding: utf-8 -*-
+"""steam_list 辅助模块（移植自 astrbot_plugin_steam_status_monitor）
+
+原插件以 ``yield event.image_result`` 返回渲染图片，Amiya-Bot 改为直接
+返回图片 bytes，由 main.py 通过 ``Chain.image(bytes)`` 发送。
+"""
+
+import io
+import time
+from typing import Optional
+
+from .game_start_render import get_avatar_frame_url, get_avatar_frame_path, get_cover_path
+from .steam_list_render import render_steam_list_image
+
+
+async def handle_steam_list(self, group_id, *, font_path: Optional[str] = None, proxy: str = None, **_kwargs) -> Optional[bytes]:
+    """列出所有玩家当前状态（图片美化版，分群支持），返回渲染后的 PNG bytes。"""
+    steam_ids = self.group_steam_ids.get(group_id, [])
+    start_play_times = self.group_start_play_times.get(group_id, {})
+    user_list = []
+    now = int(time.time())
+    # 批量查询所有玩家状态，减少API调用次数
+    status_map = await self.fetch_player_statuses_batch(steam_ids) if steam_ids else {}
+    for sid in steam_ids:
+        status = status_map.get(sid)
+        if not status:
+            user_list.append({
+                'sid': sid,
+                'name': sid,
+                'status': 'error',
+                'avatar_url': '',
+                'game': '',
+                'gameid': '',
+                'play_str': '获取失败',
+                'lastlogoff': None
+            })
+            continue
+        name = self._resolve_bind_name(sid, status.get('name') or sid)
+        gameid = status.get('gameid')
+        game = status.get('gameextrainfo')
+        lastlogoff = status.get('lastlogoff')
+        personastate = status.get('personastate', 0)
+        avatar_url = status.get('avatarfull') or status.get('avatar') or ''
+        zh_game_name = await self.get_chinese_game_name(gameid, game) if gameid else (game or "未知游戏")
+        if gameid:
+            # 修复: start_play_times[sid] 可能为 dict
+            start_time = None
+            if isinstance(start_play_times.get(sid), dict):
+                # 优先取当前游戏的开始时间
+                if gameid and gameid in start_play_times[sid]:
+                    start_time = start_play_times[sid][gameid]
+                else:
+                    # 如果没有当前游戏，取所有游戏的最晚开始时间
+                    if start_play_times[sid]:
+                        start_time = max(start_play_times[sid].values())
+            else:
+                start_time = start_play_times.get(sid)
+            play_seconds = now - start_time if start_time else 0
+            play_minutes = play_seconds / 60
+            if play_minutes < 60:
+                play_str = f"{play_minutes:.1f}分钟"
+            else:
+                play_str = f"{play_minutes/60:.1f}小时"
+            user_list.append({
+                'sid': sid,
+                'name': name,
+                'status': 'playing',
+                'avatar_url': avatar_url,
+                'game': zh_game_name,
+                'gameid': gameid,
+                'play_str': play_str,
+                'lastlogoff': lastlogoff
+            })
+        elif personastate and int(personastate) > 0:
+            user_list.append({
+                'sid': sid,
+                'name': name,
+                'status': 'online',
+                'avatar_url': avatar_url,
+                'game': '',
+                'gameid': '',
+                'play_str': '',
+                'lastlogoff': lastlogoff
+            })
+        elif lastlogoff:
+            hours_ago = (now - int(lastlogoff)) / 3600
+            user_list.append({
+                'sid': sid,
+                'name': name,
+                'status': 'offline',
+                'avatar_url': avatar_url,
+                'game': '',
+                'gameid': '',
+                'play_str': f"上次在线 {hours_ago:.1f} 小时前",
+                'lastlogoff': lastlogoff
+            })
+        else:
+            user_list.append({
+                'sid': sid,
+                'name': name,
+                'status': 'offline',
+                'avatar_url': avatar_url,
+                'game': '',
+                'gameid': '',
+                'play_str': '',
+                'lastlogoff': lastlogoff
+            })
+    # 获取所有用户的头像框
+    avatar_frame_paths = {}
+    for u in user_list:
+        sid = u.get("sid", "")
+        if sid:
+            fp = await get_avatar_frame_path(self.data_dir, sid, proxy=proxy)
+            if not fp:
+                frame_url = await get_avatar_frame_url(sid, proxy=proxy)
+                if frame_url:
+                    fp = await get_avatar_frame_path(self.data_dir, sid, frame_url, proxy=proxy)
+            if fp:
+                avatar_frame_paths[sid] = fp
+    # 获取封面
+    covers = {}
+    for u in user_list:
+        gid = u.get('gameid', '')
+        if gid:
+            cp = await get_cover_path(self.data_dir, gid, u.get('game', ''), proxy=proxy)
+            if cp:
+                covers[u['sid']] = cp
+    img_bytes = await render_steam_list_image(
+        self.data_dir, user_list, font_path=font_path, proxy=proxy,
+        avatar_frame_paths=avatar_frame_paths, covers=covers,
+    )
+    if img_bytes:
+        return io.BytesIO(img_bytes).getvalue()
+    return None

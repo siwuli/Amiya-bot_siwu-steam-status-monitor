@@ -1,0 +1,62 @@
+# ============================================================
+# Steam 状态监控插件 - 全局配置
+# 移植自 astrbot_plugin_steam_status_monitor（作者：Maoer，GPL-3.0）
+# ============================================================
+
+# Steam Web API Key（必填）
+# 获取地址：https://steamcommunity.com/dev/apikey
+steam_api_key: ""
+
+# SteamGridDB API Key（可选，用于获取游戏封面图）
+# 获取地址：https://www.steamgriddb.com/profile/preferences/api
+sgdb_api_key: ""
+
+# API 基础地址（留空使用官方地址，一般无需修改）
+steam_api_base: ""        # Steam Web API，默认 https://api.steampowered.com
+steam_store_base: ""      # Steam 商店，默认 https://store.steampowered.com
+sgdb_api_base: ""         # SteamGridDB，默认 https://www.steamgriddb.com
+
+# API 请求失败重试次数
+retry_times: 3
+
+# 代理设置（SOCKS 代理不受支持，将被忽略）
+enable_proxy: false
+proxy_url: ""             # 例如 http://127.0.0.1:7890
+
+# 轮询设置
+# 固定轮询间隔（秒），设为 0 表示使用智能轮询
+fixed_poll_interval: 0
+# 智能轮询间隔（分钟），依次对应：
+# [游戏中, 12分钟内, 12分钟~3小时, 3小时~24小时, 24~48小时, 超过48小时]
+smart_poll_intervals:
+  - 1
+  - 3
+  - 5
+  - 10
+  - 20
+  - 30
+# 是否输出详细轮询日志
+detailed_poll_log: true
+# 每个群最大监控 SteamID 数量
+max_group_size: 20
+
+# 图片缓存时长（小时）
+cache_avatar_hours: 24            # 头像
+cache_avatar_frame_hours: 720     # 头像框（默认 30 天）
+cache_cover_vertical_hours: 0     # 竖版封面（0 表示不缓存）
+
+# 每日排行榜推送时间（24 小时制）
+rank_push_hour: 8
+rank_push_minute: 30
+
+# 通知内容开关
+notify_send_text: true            # 通知附带文本
+notify_send_image: true           # 通知附带图片卡片
+enable_network_fluctuation_notify: true  # 网络波动通知
+enable_game_start_notify: true          # 开始游戏通知
+enable_game_end_notify: true            # 结束游戏通知
+enable_achievement_poll: true           # 成就监控轮询
+
+# 游戏过滤（用于决定哪些游戏参与监控/播报）
+game_filter_mode: "全部游戏"       # 可选：全部游戏 / 白名单 / 黑名单
+game_filter_ids: ""               # 游戏 ID 列表，逗号分隔（如 730,570,440）
