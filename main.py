@@ -612,7 +612,7 @@ class SteamStatusMonitorV3:
                         for sid in batch:
                             if sid not in result:
                                 try:
-                                    single = await self.fetch_player_status(sid, retry=1)
+                                    single = await asyncio.wait_for(self.fetch_player_status(sid, retry=1), timeout=8)
                                     if single:
                                         result[sid] = single
                                 except Exception as se:
@@ -1041,6 +1041,12 @@ class SteamStatusMonitorV3:
             self._poll_phase = "idle"
             self._poll_next_minute = ((int(now) // 60) + 1) * 60
             self._poll_log_time = 0
+        if not hasattr(self, '_poll_lock'):
+            self._poll_lock = asyncio.Lock()
+        if self._poll_lock.locked():
+            # 上一轮 poll 仍在执行（如网络重试耗时较长），直接返回，
+            # 避免 APScheduler 因 max_instances=1 反复输出 skipped 日志
+            return
 
         if self._poll_phase == "waiting_log":
             if now >= self._poll_log_time:
@@ -1077,34 +1083,39 @@ class SteamStatusMonitorV3:
             self._poll_next_minute = self._poll_next_minute + 60
             return
 
-        global_status_map = await self.fetch_player_statuses_batch(list(all_sids_set))
+        async with self._poll_lock:
+            global_status_map = await self.fetch_player_statuses_batch(list(all_sids_set))
 
-        # 各群并行处理状态变更检测
-        async def query_one_group(gid, sids):
-            round_msg_lines = []
-            tasks = [
-                self.check_status_change(gid, single_sid=sid, status_override=global_status_map.get(sid))
-                for sid in sids
-            ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for msg in results:
-                if isinstance(msg, Exception):
-                    log.error(f"[轮询] check_status_change 异常: {msg} (gid={gid})")
-                    continue
-                if msg:
-                    round_msg_lines.append(msg)
-            if round_msg_lines:
-                self._last_round_logs.append((gid, "\n".join(round_msg_lines)))
+            # 各群并行处理状态变更检测
+            async def query_one_group(gid, sids):
+                round_msg_lines = []
+                tasks = []
+                for sid in sids:
+                    status = global_status_map.get(sid)
+                    if status is None:
+                        # 该玩家本批查询失败（网络/API 问题），本轮跳过状态检测，
+                        # 不再重复逐条单查（会再次重试多次并大幅阻塞轮询），下个周期自动重试
+                        continue
+                    tasks.append(self.check_status_change(gid, single_sid=sid, status_override=status))
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for msg in results:
+                    if isinstance(msg, Exception):
+                        log.error(f"[轮询] check_status_change 异常: {msg} (gid={gid})")
+                        continue
+                    if msg:
+                        round_msg_lines.append(msg)
+                if round_msg_lines:
+                    self._last_round_logs.append((gid, "\n".join(round_msg_lines)))
 
-        await asyncio.gather(
-            *[query_one_group(gid, sids) for gid, sids in group_sids.items()],
-            return_exceptions=True,
-        )
-        # 统一 flush 本轮收集的所有通知（开始游戏 + 延迟退出的结束游戏），合并发送
-        await self._flush_pending_end_notifications()
-        # 40 秒后统一输出日志
-        self._poll_log_time = time.time() + 40
-        self._poll_phase = "waiting_log"
+            await asyncio.gather(
+                *[query_one_group(gid, sids) for gid, sids in group_sids.items()],
+                return_exceptions=True,
+            )
+            # 统一 flush 本轮收集的所有通知（开始游戏 + 延迟退出的结束游戏），合并发送
+            await self._flush_pending_end_notifications()
+            # 40 秒后统一输出日志
+            self._poll_log_time = time.time() + 40
+            self._poll_phase = "waiting_log"
 
     # ========== 状态检测核心 ==========
 
@@ -1762,6 +1773,16 @@ class SteamStatusMonitorV3:
         raw_steamids = args[0]
         bind_qq = data.at_target[0] if data.at_target else ''
         bind_nickname = ' '.join(args[1:]) if len(args) > 1 else ''
+        # 兼容写法：未 @ 用户时，若尾随参数中含 QQ 号（5-11 位数字），将其作为绑定目标，
+        # 其余部分作为备注（例如：steam addid 好友码 1554808351）
+        if not bind_qq and len(args) > 1:
+            rest = args[1:]
+            for i, token in enumerate(rest):
+                token_clean = token.strip().lstrip('@')
+                if token_clean.isdigit() and 5 <= len(token_clean) <= 11:
+                    bind_qq = token_clean
+                    bind_nickname = ' '.join(rest[i + 1:]).strip()
+                    break
         raw_list = [x.strip() for x in re.split(r'[,，]+', raw_steamids) if x.strip()]
         resolved_list, invalid_list = [], []
         for raw in raw_list:
@@ -2158,7 +2179,7 @@ class SteamStatusMonitorV3:
         qq_clean = qq.strip().lstrip('@')
         info = self._bind_data.get(qq_clean)
         if not info:
-            await _send(data, f"QQ {qq_clean} 未绑定任何 SteamID，请先使用「steam addid SteamID @{qq_clean}」")
+            await _send(data, f"QQ {qq_clean} 未绑定任何 SteamID，请先使用「steam addid SteamID @{qq_clean}」（或「steam addid SteamID {qq_clean}」）绑定")
             return
         sid = info.get("sid", "")
         if not sid:
