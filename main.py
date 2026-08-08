@@ -61,7 +61,7 @@ curr_dir = os.path.dirname(os.path.abspath(__file__))
 
 bot = AmiyaBotPluginInstance(
     name="Steam 状态监控",
-    version="1.0",
+    version="1.1",
     plugin_id="siwu-steam-status-monitor",
     plugin_type="functional",
     description="监控群内 Steam 玩家在线状态与游戏动态：开始/结束游戏、成就解锁、网络波动自动推送，游戏时长排行榜与每日榜单推送，支持分群管理与绑定。",
@@ -110,7 +110,7 @@ class SteamStatusMonitorV3:
     """Steam 状态监控核心逻辑（移植自原插件 SteamStatusMonitorV3）。"""
 
     def __init__(self):
-        self._plugin_version = "1.0"
+        self._plugin_version = "1.1"
         self.API_KEY = _cfg('steam_api_key', '')
         self.SGDB_API_KEY = _cfg('sgdb_api_key', '')
         self.STEAM_API_BASE = (_cfg('steam_api_base', '') or 'https://api.steampowered.com').rstrip('/')
