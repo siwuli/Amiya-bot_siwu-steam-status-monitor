@@ -21,10 +21,10 @@ async def get_avatar_path(data_dir, steamid, url, force_update=False, proxy=None
     os.makedirs(avatar_dir, exist_ok=True)
     path = os.path.join(avatar_dir, f"{steamid}.jpg")
     refresh_interval = _cache_config.get("avatar", 86400)
-    if refresh_interval > 0 and os.path.exists(path) and not force_update:
+    if refresh_interval > 0 and _is_valid_cache(path) and not force_update:
         if time.time() - os.path.getmtime(path) < refresh_interval:
             return path
-    elif refresh_interval == 0 and os.path.exists(path):
+    elif refresh_interval == 0 and _is_valid_cache(path):
         return path
     try:
         resp = await http_get(url, proxy=proxy, timeout=10)
@@ -34,12 +34,17 @@ async def get_avatar_path(data_dir, steamid, url, force_update=False, proxy=None
             return path
     except Exception:
         pass
-    return path if os.path.exists(path) else None
+    return path if _is_valid_cache(path) else None
 
 
 def set_cache_config(config_dict):
     global _cache_config
     _cache_config.update(config_dict)
+
+
+def _is_valid_cache(path):
+    """缓存文件是否有效：存在且非空（0 字节等损坏文件视为无效，重新下载）。"""
+    return os.path.exists(path) and os.path.getsize(path) > 0
 
 
 _frame_url_cache = {}  # {steamid: (url_or_None, timestamp)}
@@ -98,18 +103,14 @@ async def get_avatar_frame_path(data_dir, steamid, url=None, proxy=None):
         for fname in os.listdir(frame_dir):
             if fname.startswith(f"{steamid}_") and fname.endswith(".png"):
                 path = os.path.join(frame_dir, fname)
-                if refresh_interval > 0 and time.time() - os.path.getmtime(path) < refresh_interval:
-                    return path
-                elif refresh_interval == 0:
+                if _is_valid_cache(path) and (refresh_interval > 0 and time.time() - os.path.getmtime(path) < refresh_interval or refresh_interval == 0):
                     return path
     # 本地无缓存 + 有URL → 下载
     if not url:
         return None
     url_hash = hashlib.md5(url.encode()).hexdigest()[:12]
     path = os.path.join(frame_dir, f"{steamid}_{url_hash}.png")
-    if refresh_interval > 0 and os.path.exists(path) and time.time() - os.path.getmtime(path) < refresh_interval:
-        return path
-    elif refresh_interval == 0 and os.path.exists(path):
+    if _is_valid_cache(path) and (refresh_interval > 0 and time.time() - os.path.getmtime(path) < refresh_interval or refresh_interval == 0):
         return path
     try:
         resp = await http_get(url, proxy=proxy, timeout=10)
@@ -119,7 +120,7 @@ async def get_avatar_frame_path(data_dir, steamid, url=None, proxy=None):
             return path
     except Exception:
         pass
-    return path if os.path.exists(path) else None
+    return path if _is_valid_cache(path) else None
 
 
 async def get_sgdb_vertical_cover(game_name, sgdb_api_key=None, sgdb_game_name=None, appid=None, proxy=None):
@@ -225,9 +226,9 @@ async def get_cover_path(data_dir, gameid, game_name, force_update=False, sgdb_a
     path = os.path.join(cover_dir, f"{gameid}.jpg")
     # 只在本地不存在时才云端获取
     cover_refresh = _cache_config.get("cover_vertical", 0)
-    if cover_refresh == 0 and os.path.exists(path):
+    if cover_refresh == 0 and _is_valid_cache(path):
         return path
-    elif cover_refresh > 0 and os.path.exists(path):
+    elif cover_refresh > 0 and _is_valid_cache(path):
         if time.time() - os.path.getmtime(path) < cover_refresh:
             return path
     # 只尝试 SGDB 竖版封面
@@ -254,7 +255,7 @@ async def get_horizontal_cover_path(data_dir, gameid, appid=None, proxy=None):
     cover_dir = os.path.join(data_dir, "covers_h")
     os.makedirs(cover_dir, exist_ok=True)
     path = os.path.join(cover_dir, f"{gameid}.jpg")
-    if os.path.exists(path):
+    if _is_valid_cache(path):
         return path
     if not appid:
         return None
@@ -274,7 +275,7 @@ async def get_horizontal_cover_path(data_dir, gameid, appid=None, proxy=None):
                     return path
     except Exception as e:
         print(f"[get_horizontal_cover_path] 获取横版封面异常: {e}")
-    return path if os.path.exists(path) else None
+    return path if _is_valid_cache(path) else None
 
 
 def text_wrap(text, font, max_width):

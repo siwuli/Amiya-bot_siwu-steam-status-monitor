@@ -6,7 +6,7 @@ import time
 from PIL import Image, ImageDraw, ImageFont
 
 from .http_util import http_get
-from .game_start_render import get_avatar_frame_url, get_avatar_frame_path, _cache_config, get_horizontal_cover_path
+from .game_start_render import _cache_config, _is_valid_cache, get_avatar_frame_path, get_avatar_frame_url, get_horizontal_cover_path
 
 # 更深的蓝紫色到黑色渐变
 BG_COLOR_TOP = (24, 18, 48)   # 顶部深蓝紫
@@ -81,7 +81,7 @@ async def get_avatar_path(data_dir, steamid, url, force_update=False, proxy=None
     path = os.path.join(avatar_dir, f"{steamid}.jpg")
     refresh_interval = _cache_config.get("avatar", 86400)
     print(f"[game_end_render] get_avatar_path: url={url}, path={path}, exists={os.path.exists(path)}")
-    if os.path.exists(path) and not force_update:
+    if _is_valid_cache(path) and not force_update:
         if refresh_interval > 0 and time.time() - os.path.getmtime(path) < refresh_interval:
             print(f"[game_end_render] 使用本地头像: {path}, size={os.path.getsize(path)}")
             return path
@@ -99,7 +99,7 @@ async def get_avatar_path(data_dir, steamid, url, force_update=False, proxy=None
             print(f"[game_end_render] 头像下载失败: HTTP {status} url={url}")
     except Exception as e:
         print(f"[game_end_render] 头像下载异常: {e}")
-    return path if os.path.exists(path) else None
+    return path if _is_valid_cache(path) else None
 
 
 # 渐变背景函数补充
@@ -123,9 +123,9 @@ async def get_cover_path(data_dir, gameid, game_name, force_update=False, sgdb_a
     os.makedirs(cover_dir, exist_ok=True)
     path = os.path.join(cover_dir, f"{gameid}.jpg")
     cover_refresh = _cache_config.get("cover_vertical", 0)
-    if cover_refresh == 0 and os.path.exists(path):
+    if cover_refresh == 0 and _is_valid_cache(path):
         return path
-    elif cover_refresh > 0 and os.path.exists(path):
+    elif cover_refresh > 0 and _is_valid_cache(path):
         if time.time() - os.path.getmtime(path) < cover_refresh:
             return path
     # 只尝试 SGDB 竖版封面
