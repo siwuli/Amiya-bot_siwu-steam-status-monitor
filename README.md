@@ -64,6 +64,30 @@
 - `rank_push_groups.json`：每日榜单推送配置
 - `avatars/`、`covers/` 等：图片缓存（可用 `steam clear_cache` 清理）
 
+## 更新日志
+
+### v1.0（2026-08-09）
+
+**主要功能**
+- 完整移植 astrbot_plugin_steam_status_monitor 至 Amiya-Bot，功能与原版对齐
+- 分群 Steam 状态监控：智能/固定轮询、跨群批量查询去重，节省 API 调用
+- 开始/结束游戏、成就解锁、网络波动自动推送（图片卡片 + 文本）
+- 游戏时长排行榜（今日/最近 N 天/全群）与每日定时榜单推送
+- QQ-SteamID 绑定、联动推送组、多账号机器人支持
+
+**细节与修复**
+- 修复 HTTP 请求在连接释放后无法读取响应体（`ClientConnectionError: Connection closed`）的问题：改为在关闭连接前缓存完整 body 的轻量响应对象
+- 请求失败时记录真实异常类型（超时/连接失败/DNS），不再吞成"无响应"
+- 轮询任务增加防重叠保护，避免网络故障期间定时任务被反复跳过
+- 批量查询失败的玩家本轮跳过状态检测，不再重复逐条重试拖死轮询
+- 图片缓存增加有效性校验，0 字节等损坏文件不再被永久缓存，自动重新下载
+- `steam addid SteamID QQ号` 支持尾随 QQ 号绑定（无需 @ 自己）
+- 素材文件名改为 ASCII，规避 Amiya-Bot 解压中文文件名的兼容问题
+
 ## 许可证
 
 本插件基于 GPL-3.0 许可证开源，衍生自 [astrbot_plugin_steam_status_monitor](https://github.com/Maoer233/astrbot_plugin_steam_status_monitor)（作者：Maoer）。
+
+## 项目地址
+
+https://github.com/siwuli/Amiya-bot_siwu-steam-status-monitor
