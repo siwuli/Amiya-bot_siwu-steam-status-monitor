@@ -11,7 +11,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PLUGIN_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_ZIP = os.path.join(ROOT, 'plugins', 'siwu-steam-status-monitor-1.1.zip')
+OUTPUT_ZIP = os.path.join(ROOT, 'plugins', 'siwu-steam-status-monitor-1.2.zip')
 
 
 def _add_dir(zf: zipfile.ZipFile, src_dir: str):
